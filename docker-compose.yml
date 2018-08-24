@@ -1,0 +1,11 @@
+version: '2'
+services:
+  postgres1:
+    image: postgres
+    container_name: postgres1
+    environment:
+      - POSTGRES_PASSWORD=postgres
+    volumes:
+      - /home/robin/go/src/redAsset/data:/var/lib/postgresql/data
+    ports:
+        - 5433:5432
