@@ -1,59 +1,41 @@
 # redasset
 
-This tool allows to parse and analyze huge datasets to enumerate and analyze a target network/provider/company.
+This tool allows to enumerate domains of a defined 2nd-lvl domain list by using the following methods:
 
-There are two main actions:
-
-a) Parse scans.io gzipped files and import domains/hosts based on include/exclude 2nd domain lists.
-b) Use a list of hosts to perform a webanalyze on them.
+1. Parse gzipped Rapid7 scans and filter by white- and blacklist.
+2. Query certificate transparency logs.
 
 ## Usage
 
-### Configuration
-
-To make use of postgres, export a DB URI:
-
-    $ export DB=postgres://postgres:postgres@localhost/postgres?sslmode=disable
-
-The docker-compose.yml file can be used to set up a postgres server.
-
-### Parsing
-
-Currently there two main methods implemented to parse hosts/domains from the scans.io project:
-
-1. Parse a FDNS gzip file.
-2. Parse a HTTP80 scan.
+Note: The rapid7 file can still be gzipped.
 
 The following parameters may be used:
 
 ```
-% ./redAsset parse -h
-Usage of parse:
+$ Usage of ./redAsset:
   -bdomains string
-    	File containing 2nd level BLACKLIST domains.
+      File containing 2nd level domains to exclude.
   -domains string
-    	File containing 2nd level domains to filter for.
+      File containing 2nd level domains to include.
   -file string
-    	Filename to parse from. Gzip files allowed.
-  -output string
-    	Output format (json|postgres) (default "json")
-  -type string
-    	File format. (rapid7-http|rapid7-fdns) (default "rapid7-http")
+      Filename to parse from. Gzip files allowed.
+
 ```
+
+Log is printed to stderr, results to stdout, so you may pipe this to a results file.
 
 Example of a FDNS parse:
 
-    $ ./redAsset parse -file ~/work/rangemap/data/20170417-fdns.json.gz -domains dtag_second_level_domains.txt -bdomains dtag_second_level_domains_exclude.txt -output json -type rapid7-fdns
-    2017/06/16 09:37:12 Limiting to 158 parsed domains.
-    2017/06/16 09:37:12 Limiting to 19 parsed blacklist domains.
-    {"Timestamp":"1492391616","Name":"0060118671.telekom-profis.de","Type":"a","Value":"80.237.195.199"}
-    {"Timestamp":"1492392013","Name":"0060177055.telekom-profis.de","Type":"a","Value":"80.237.195.199"}
-    {"Timestamp":"1492391637","Name":"0060242909.telekom-profis.de","Type":"a","Value":"80.237.195.199"}
+    $ ./redAsset -file ~/data/20170417-fdns.json.gz -domains second_level_domains.txt -bdomains blacklist_domains.txt -type rapid7-fdns
+    2018/08/24 18:55:10 Limiting to 158 parsed domains.
+    2018/08/24 18:55:10 Limiting to 19 parsed blacklist domains.
+    0060118671.telekom-profis.de
+    0060177055.telekom-profis.de
+    [...]
 
-### Analyzing
+### Post processing
 
-The analyze action will make use of github.com/rverton/webanalyze to guess used webapps (and their versions). The results can be exported (json) or directly written back to the databcan be exported (json) or directly written back to the database.
+Don't forget to deduplicate:
 
-Example of a webanalyse from db:
+    $ cat ~/data/domains.txt | sort -u
 
-    $ ./redAsset analyze -input postgres -output postgres
