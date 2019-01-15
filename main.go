@@ -23,7 +23,7 @@ func main() {
 	parseFile := flag.String("file", "", "JSON file to parse from, gzip allowed.")
 	parseDomainFilter := flag.String("domains", "", "File containing 2nd level domains to include.")
 	parseDomainBlacklist := flag.String("bdomains", "", "File containing 2nd level domains to exclude.")
-	useCATrans := flag.Bool("catrans", true, "Query certificate transparency logs.")
+	useCATrans := flag.Bool("catransoff", false, "Query certificate transparency logs.")
 
 	flag.Parse()
 
@@ -65,7 +65,7 @@ func main() {
 		wg.Done()
 	}()
 
-	if *useCATrans {
+	if !*useCATrans {
 		wg.Add(1)
 		go func() {
 
@@ -100,14 +100,13 @@ func queryCATransparency(allowed []string, blacklist []string) {
 			continue
 		}
 
-		sbody := strings.Replace(string(body), "}{", "},{", -1)
-		sbody = fmt.Sprintf("[%v]", sbody)
-
-		json.Unmarshal([]byte(sbody), &bodyDomain)
+		json.Unmarshal([]byte(body), &bodyDomain)
 
 		for _, d := range bodyDomain {
 			handleResult(d.Domain, allowed, blacklist)
 		}
+
+		log.Printf("CA transparency: Got %v certificates for '%v'", len(bodyDomain), domain)
 	}
 }
 
@@ -115,8 +114,8 @@ func parseFDNS(fname string, allowed []string, blacklist []string) {
 
 	for host := range parseDnsHosts(fname) {
 
-		if count%100000 == 0 && count > 0 {
-			log.Printf("\r%vk processed, %v valid (took %v)", count/1000, valid, time.Since(tt))
+		if count%1000000 == 0 && count > 0 {
+			log.Printf("FDNS: %vm processed, %v valid (took %v)", count/1000000, valid, time.Since(tt))
 			tt = time.Now()
 		}
 
@@ -153,7 +152,5 @@ func isAllowed(allowed []string, domain string) bool {
 			return true
 		}
 	}
-
 	return false
-
 }

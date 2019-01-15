@@ -26,7 +26,7 @@ Log is printed to stderr, results to stdout, so you may pipe this to a results f
 
 Example of a FDNS parse:
 
-    $ ./redAsset -file ~/data/20170417-fdns.json.gz -domains second_level_domains.txt -bdomains blacklist_domains.txt -type rapid7-fdns
+    $ ./redAsset -file ~/data/20170417-fdns.json.gz -domains second_level_domains.txt -bdomains blacklist_domains.txt
     2018/08/24 18:55:10 Limiting to 158 parsed domains.
     2018/08/24 18:55:10 Limiting to 19 parsed blacklist domains.
     0060118671.telekom-profis.de
