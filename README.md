@@ -12,17 +12,20 @@ Note: The rapid7 file can still be gzipped.
 The following parameters may be used:
 
 ```
-$ Usage of ./redAsset:
+$ ./redAsset 
+Usage:
   -bdomains string
-      File containing 2nd level domains to exclude.
+    	File containing 2nd level domains to exclude.
+  -catransoff
+    	Deactivate querying certificate transparency logs (crt.sh).
   -domains string
-      File containing 2nd level domains to include.
+    	File containing 2nd level domains to include.
   -file string
-      Filename to parse from. Gzip files allowed.
+    	JSON file to parse from, gzip allowed.
 
 ```
 
-Log is printed to stderr, results to stdout, so you may pipe this to a results file.
+Log is printed to *stderr*, results to *stdout*, so you may pipe this to a results file.
 
 Example of a FDNS parse:
 
