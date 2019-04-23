@@ -56,18 +56,14 @@ func parseDnsHosts(filename string) <-chan DNSEntry {
 			f = file
 		}
 
-		r := bufio.NewReader(f)
-
-		var line []byte
 		var e DNSEntry
 
-		for {
-			line, err = readLine(r)
-			if err != nil {
-				break
-			}
+		scanner := bufio.NewScanner(f)
 
-			err := json.Unmarshal(line, &e)
+		for scanner.Scan() {
+			t := scanner.Bytes()
+
+			err := json.Unmarshal(t, &e)
 			if err != nil {
 				log.Printf("Error while unmarshaling: %v", err)
 				continue

@@ -46,7 +46,7 @@ func main() {
 			log.Fatalf("Error reading domain file: %v", err)
 		}
 
-		log.Printf("Limiting to %v 2nd-lvl domains.", len(allowedDomains))
+		log.Printf("Limiting to %v domains and %v CIDRs.", len(allowedDomains), len(ips))
 	}
 
 	if *parseDomainBlacklist != "" {
@@ -61,9 +61,8 @@ func main() {
 
 	wg.Add(1)
 	go func() {
-		log.Println("Parsing FDNS file.")
-		parseFDNS(*parseFile, allowedDomains, blacklistDomains, ips)
-		wg.Done()
+		log.Println("Starting FDNS search.")
+		parseFDNS(*parseFile, allowedDomains, blacklistDomains, ips, &wg)
 	}()
 
 	if !*useCATrans {
@@ -112,15 +111,15 @@ func queryCATransparency(allowed []string, blacklist []string) {
 	}
 }
 
-func parseFDNS(fname string, allowed []string, blacklist []string, ips []*net.IPNet) {
+func parseFDNS(fname string, allowed []string, blacklist []string, ips []*net.IPNet, wg *sync.WaitGroup) {
 
 	if len(allowed) <= 0 && len(ips) <= 0 {
-		log.Fatal("No valid domains (0) and IPs (0) parsed.")
+		log.Fatal("No valid domains (0) and IPs (0) parsed from input.")
 	}
 
 	for dnsentry := range parseDnsHosts(fname) {
 
-		if count%1000000 == 0 && count > 0 {
+		if count%5000000 == 0 && count > 0 {
 			log.Printf("FDNS: %vm processed, %v valid (took %v)", count/1000000, valid, time.Since(tt))
 			tt = time.Now()
 		}
@@ -133,6 +132,7 @@ func parseFDNS(fname string, allowed []string, blacklist []string, ips []*net.IP
 		count++
 	}
 
+	wg.Done()
 }
 
 func isValidResult(dnsentry DNSEntry, allowed []string, blacklist []string, ips []*net.IPNet) bool {
@@ -142,6 +142,7 @@ func isValidResult(dnsentry DNSEntry, allowed []string, blacklist []string, ips 
 		entryIp := net.ParseIP(dnsentry.Value)
 		for _, ip := range ips {
 			if ip.Contains(entryIp) {
+				log.Printf("IP matched: %v (%v) in %v", dnsentry.Name, entryIp, ip)
 				return true
 			}
 		}
