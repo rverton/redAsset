@@ -11,19 +11,21 @@ import (
 	"os"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
 var jsonOutput *json.Encoder
-var count = 1
-var valid = 0
+var count uint64
+var valid uint64
+var workers int
 var tt = time.Now()
 
 func main() {
-
 	parseFile := flag.String("file", "", "JSON file to parse from, gzip allowed.")
 	parseDomainFilter := flag.String("domains", "", "File containing 2nd level domains to include.")
 	parseDomainBlacklist := flag.String("bdomains", "", "File containing 2nd level domains to exclude.")
+	workers = *flag.Int("workers", 4, "Number of workers to start.")
 	useCATrans := flag.Bool("catransoff", false, "Deactivate querying certificate transparency logs (crt.sh).")
 
 	flag.Parse()
@@ -103,7 +105,7 @@ func queryCATransparency(allowed []string, blacklist []string) {
 		for _, d := range bodyDomain {
 			if isValidResult(DNSEntry{Name: d.Domain}, allowed, blacklist, []*net.IPNet{}) {
 				fmt.Println(d.Domain)
-				valid++
+				atomic.AddUint64(&valid, 1)
 			}
 		}
 
@@ -117,22 +119,26 @@ func parseFDNS(fname string, allowed []string, blacklist []string, ips []*net.IP
 		log.Fatal("No valid domains (0) and IPs (0) parsed from input.")
 	}
 
-	for dnsentry := range parseDnsHosts(fname) {
+	for i := 0; i < workers; i++ {
+		wg.Add(1)
+		go func() {
+			for dnsentry := range parseDnsHosts(fname) {
 
-		if count%5000000 == 0 && count > 0 {
-			log.Printf("FDNS: %vm processed, %v valid (took %v)", count/1000000, valid, time.Since(tt))
-			tt = time.Now()
-		}
+				c := atomic.AddUint64(&count, 1)
 
-		if isValidResult(dnsentry, allowed, blacklist, ips) {
-			fmt.Println(dnsentry.Name)
-			valid++
-		}
+				if isValidResult(dnsentry, allowed, blacklist, ips) {
+					fmt.Println(dnsentry.Name)
+					atomic.AddUint64(&valid, 1)
+				}
 
-		count++
+				if c%5000000 == 0 && c > 0 {
+					log.Printf("FDNS: %vm processed, %v valid (took %v)", c/1000000, atomic.LoadUint64(&valid), time.Since(tt))
+					tt = time.Now()
+				}
+			}
+			wg.Done()
+		}()
 	}
-
-	wg.Done()
 }
 
 func isValidResult(dnsentry DNSEntry, allowed []string, blacklist []string, ips []*net.IPNet) bool {

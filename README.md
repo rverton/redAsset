@@ -15,8 +15,8 @@ Note: The rapid7 file can still be gzipped.
 The following parameters may be used:
 
 ```
-$ ./redAsset 
-Usage:
+$ ./redAsset -h
+Usage of ./redAsset:
   -bdomains string
     	File containing 2nd level domains to exclude.
   -catransoff
@@ -25,6 +25,9 @@ Usage:
     	File containing 2nd level domains to include.
   -file string
     	JSON file to parse from, gzip allowed.
+  -workers int
+    	Number of workers to start. (default 4)
+
 
 ```
 
