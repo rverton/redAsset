@@ -4,6 +4,9 @@ This tool allows to enumerate domains of a defined 2nd-lvl domain list by using 
 
 1. Parse gzipped Rapid7 scans and filter by white- and blacklist.
 2. Query certificate transparency logs.
+3. Search for domains by passing CIDR.
+
+The CIDR search can be used to map a huge list of IPs/networks to domain names.
 
 ## Usage
 
@@ -24,6 +27,13 @@ Usage:
     	JSON file to parse from, gzip allowed.
 
 ```
+
+When CIDR notations are present, they are parsed and IPs of DNS entries are checked if they belong to these networks. Example `-domains` file:
+
+    robinverton.de
+    10.0.0.1/24
+
+This will search for all domains ending with `.robinverton.de` and for DNS entries which map to an IP matching `10.0.0.1/24`.
 
 Log is printed to *stderr*, results to *stdout*, so you may pipe this to a results file.
 

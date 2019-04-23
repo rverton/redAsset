@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"log"
+	"net"
 	"net/http"
 	"os"
 	"strings"
@@ -23,12 +24,13 @@ func main() {
 	parseFile := flag.String("file", "", "JSON file to parse from, gzip allowed.")
 	parseDomainFilter := flag.String("domains", "", "File containing 2nd level domains to include.")
 	parseDomainBlacklist := flag.String("bdomains", "", "File containing 2nd level domains to exclude.")
-	useCATrans := flag.Bool("catransoff", false, "Query certificate transparency logs.")
+	useCATrans := flag.Bool("catransoff", false, "Deactivate querying certificate transparency logs (crt.sh).")
 
 	flag.Parse()
 
 	var allowedDomains []string
 	var blacklistDomains []string
+	var ips []*net.IPNet
 	var wg sync.WaitGroup
 
 	if *parseFile == "" {
@@ -39,7 +41,7 @@ func main() {
 
 	if *parseDomainFilter != "" {
 		var err error
-		allowedDomains, err = parseDomainFile(*parseDomainFilter)
+		allowedDomains, ips, err = parseDomainFile(*parseDomainFilter)
 		if err != nil {
 			log.Fatalf("Error reading domain file: %v", err)
 		}
@@ -49,7 +51,7 @@ func main() {
 
 	if *parseDomainBlacklist != "" {
 		var err error
-		blacklistDomains, err = parseDomainFile(*parseDomainBlacklist)
+		blacklistDomains, ips, err = parseDomainFile(*parseDomainBlacklist)
 		if err != nil {
 			log.Fatalf("Error reading blacklist domain file: %v", err)
 		}
@@ -59,16 +61,14 @@ func main() {
 
 	wg.Add(1)
 	go func() {
-
 		log.Println("Parsing FDNS file.")
-		parseFDNS(*parseFile, allowedDomains, blacklistDomains)
+		parseFDNS(*parseFile, allowedDomains, blacklistDomains, ips)
 		wg.Done()
 	}()
 
 	if !*useCATrans {
 		wg.Add(1)
 		go func() {
-
 			log.Println("Querying certificate transparency logs.")
 			queryCATransparency(allowedDomains, blacklistDomains)
 			wg.Done()
@@ -94,7 +94,6 @@ func queryCATransparency(allowed []string, blacklist []string) {
 		}
 		defer resp.Body.Close()
 
-		// because of malformed json, we need to hack around it
 		body, err := ioutil.ReadAll(resp.Body)
 		if err != nil {
 			continue
@@ -103,46 +102,71 @@ func queryCATransparency(allowed []string, blacklist []string) {
 		json.Unmarshal([]byte(body), &bodyDomain)
 
 		for _, d := range bodyDomain {
-			handleResult(d.Domain, allowed, blacklist)
+			if isValidResult(DNSEntry{Name: d.Domain}, allowed, blacklist, []*net.IPNet{}) {
+				fmt.Println(d.Domain)
+				valid++
+			}
 		}
 
 		log.Printf("CA transparency: Got %v certificates for '%v'", len(bodyDomain), domain)
 	}
 }
 
-func parseFDNS(fname string, allowed []string, blacklist []string) {
+func parseFDNS(fname string, allowed []string, blacklist []string, ips []*net.IPNet) {
 
-	for host := range parseDnsHosts(fname) {
+	if len(allowed) <= 0 && len(ips) <= 0 {
+		log.Fatal("No valid domains (0) and IPs (0) parsed.")
+	}
+
+	for dnsentry := range parseDnsHosts(fname) {
 
 		if count%1000000 == 0 && count > 0 {
 			log.Printf("FDNS: %vm processed, %v valid (took %v)", count/1000000, valid, time.Since(tt))
 			tt = time.Now()
 		}
 
-		handleResult(host, allowed, blacklist)
+		if isValidResult(dnsentry, allowed, blacklist, ips) {
+			fmt.Println(dnsentry.Name)
+			valid++
+		}
 
 		count++
 	}
 
 }
 
-func handleResult(domain string, allowed []string, blacklist []string) {
+func isValidResult(dnsentry DNSEntry, allowed []string, blacklist []string, ips []*net.IPNet) bool {
+
+	//check if IP is in one of the parsed networks
+	if len(ips) > 0 {
+		entryIp := net.ParseIP(dnsentry.Value)
+		for _, ip := range ips {
+			if ip.Contains(entryIp) {
+				return true
+			}
+		}
+
+		// if no allowed domains are passed, stop here
+		if len(allowed) <= 0 {
+			return false
+		}
+	}
+
 	// check if allowed domain
 	if len(allowed) > 0 {
-		if !isAllowed(allowed, domain) {
-			return
+		if !isAllowed(allowed, dnsentry.Name) {
+			return false
 		}
 	}
 
 	// remove blacklisted domains
 	if len(blacklist) > 0 {
-		if isAllowed(blacklist, domain) {
-			return
+		if isAllowed(blacklist, dnsentry.Name) {
+			return false
 		}
 	}
 
-	fmt.Println(domain)
-	valid++
+	return true
 }
 
 func isAllowed(allowed []string, domain string) bool {

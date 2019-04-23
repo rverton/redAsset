@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"net"
 	"os"
 	"strings"
 )
@@ -31,9 +32,9 @@ func readLine(r *bufio.Reader) ([]byte, error) {
 	return ln, err
 }
 
-func parseDnsHosts(filename string) <-chan string {
+func parseDnsHosts(filename string) <-chan DNSEntry {
 
-	ch := make(chan string)
+	ch := make(chan DNSEntry)
 
 	go func() {
 		var f io.ReadCloser
@@ -72,7 +73,7 @@ func parseDnsHosts(filename string) <-chan string {
 				continue
 			}
 
-			ch <- e.Name
+			ch <- e
 
 		}
 		close(ch)
@@ -82,29 +83,38 @@ func parseDnsHosts(filename string) <-chan string {
 
 }
 
-func parseDomainFile(filename string) ([]string, error) {
+func parseDomainFile(filename string) ([]string, []*net.IPNet, error) {
+
+	handle, err := os.Open(filename)
+	if err != nil {
+		return []string{}, []*net.IPNet{}, err
+	}
+	defer handle.Close()
+
+	return parseDomainsOrCIDR(handle)
+
+}
+
+func parseDomainsOrCIDR(handle io.Reader) ([]string, []*net.IPNet, error) {
 
 	var domains []string
+	var ips []*net.IPNet
 
-	file, err := os.Open(filename)
-	if err != nil {
-		return domains, err
-	}
-	defer file.Close()
+	scanner := bufio.NewScanner(handle)
 
-	r := bufio.NewReader(file)
-	var line []byte
+	for scanner.Scan() {
+		t := scanner.Text()
 
-	for {
-		line, err = readLine(r)
+		// parse domain or CIDR IPNet
+		_, ipv4Net, err := net.ParseCIDR(t)
 		if err != nil {
-			break
+			s := fmt.Sprintf(".%v", t)
+			domains = append(domains, s)
+		} else {
+			ips = append(ips, ipv4Net)
 		}
 
-		s := fmt.Sprintf(".%v", string(line))
-
-		domains = append(domains, s)
 	}
 
-	return domains, nil
+	return domains, ips, nil
 }
