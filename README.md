@@ -8,6 +8,13 @@ This tool allows to enumerate domains of a defined 2nd-lvl domain list by using 
 
 The CIDR search can be used to map a huge list of IPs/networks to domain names.
 
+## Installation
+
+```
+$ go get github.com/rverton/redAsset
+$ go install github.com/rverton/redAsset
+```
+
 ## Usage
 
 Note: The rapid7 file can still be gzipped.
@@ -15,7 +22,7 @@ Note: The rapid7 file can still be gzipped.
 The following parameters may be used:
 
 ```
-$ ./redAsset -h
+$ redAsset -h
 Usage of ./redAsset:
   -bdomains string
     	File containing 2nd level domains to exclude.
