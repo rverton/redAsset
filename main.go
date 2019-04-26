@@ -61,7 +61,6 @@ func main() {
 		log.Printf("Limiting to %v blacklisted 2nd-lvl domains.", len(blacklistDomains))
 	}
 
-	wg.Add(1)
 	go func() {
 		log.Println("Starting FDNS search.")
 		parseFDNS(*parseFile, allowedDomains, blacklistDomains, ips, &wg)
